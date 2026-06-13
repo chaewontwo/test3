@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>제주 주요 지점 거리 측정 (Leaflet)</title>
+    
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+    
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Noto Sans KR', sans-serif;
+        }
+        #map {
+            width: 100vw;
+            height: 100vh;
+        }
+        /* 안내창 스타일 */
+        .info-panel {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 15px 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            z-index: 1000;
+            max-width: 320px;
+        }
+        .info-panel h3 {
+            margin-top: 0;
+            margin-bottom: 10px;
+            color: #333;
+            border-bottom: 2px solid #3388ff;
+            padding-bottom: 5px;
+        }
+        .info-panel p {
+            margin: 5px 0;
+            font-size: 0.9rem;
+            color: #555;
+        }
+        .distance-val {
+            font-weight: bold;
+            color: #d32f2f;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="map"></div>
+
+    <div class="info-panel">
+        <h3>📍 지점 간 직선 거리</h3>
+        <p>1. 공항 ↔ 중앙여고: <span id="dist1" class="distance-val">계산 중...</span></p>
+        <p>2. 중앙여고 ↔ 제주대: <span id="dist2" class="distance-val">계산 중...</span></p>
+        <p>3. 공항 ↔ 제주대: <span id="dist3" class="distance-val">계산 중...</span></p>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    
+    <script>
+        // 1. 지도 초기화 (제주 중심부 좌표로 설정, 줌 레벨 12)
+        const map = L.map('map').setView([33.48d, 126.53], 12);
+
+        // 2. 배경 지도 타일 레이어 추가 (OpenStreetMap)
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        }).addTo(map);
+
+        // 3. 각 장소의 위경도 좌표 정의
+        const locations = {
+            airport: { name: "제주국제공항", coords: [33.5104, 126.4914] },
+            highschool: { name: "제주중앙여자고등학교", coords: [33.4905, 126.5414] },
+            university: { name: "제주대학교 아라캠퍼스", coords: [33.4560, 126.5621] }
+        };
+
+        // 4. 마커 생성 및 지도 추가
+        const markerAirport = L.marker(locations.airport.coords).addTo(map).bindPopup(`<b>${locations.airport.name}</b>`);
+        const markerHighschool = L.marker(locations.highschool.coords).addTo(map).bindPopup(`<b>${locations.highschool.name}</b>`);
+        const markerUniversity = L.marker(locations.university.coords).addTo(map).bindPopup(`<b>${locations.university.name}</b>`);
+
+        // 5. Leaflet 내장 함수를 이용한 거리 계산 (단위: 미터 -> 킬로미터 변환)
+        // L.latLng().distanceTo() 함수는 대권 거리(직선 거리)를 미터 단위로 반환합니다.
+        const latLngAirport = L.latLng(locations.airport.coords);
+        const latLngHighschool = L.latLng(locations.highschool.coords);
+        const latLngUniversity = L.latLng(locations.university.coords);
+
+        const d1 = (latLngAirport.distanceTo(latLngHighschool) / 1000).toFixed(2); // 공항-중앙여고
+        const d2 = (latLngHighschool.distanceTo(latLngUniversity) / 1000).toFixed(2); // 중앙여고-제주대
+        const d3 = (latLngAirport.distanceTo(latLngUniversity) / 1000).toFixed(2); // 공항-제주대
+
+        // 6. UI 패널에 거리 텍스트 업데이트
+        document.getElementById('dist1').innerText = `${d1} km`;
+        document.getElementById('dist2').innerText = `${d2} km`;
+        document.getElementById('dist3').innerText = `${d3} km`;
+
+        // 7. 지도 위에 지점들을 잇는 직선(Polyline) 그리기
+        // 공항 -> 중앙여고 -> 제주대 라인 (파란색)
+        const pathCoordinates = [
+            locations.airport.coords,
+            locations.highschool.coords,
+            locations.university.coords
+        ];
+        
+        const polyline = L.polyline(pathCoordinates, {
+            color: '#3388ff',
+            weight: 4,
+            opacity: 0.7,
+            dashArray: '5, 10' // 점선 스타일
+        }).addTo(map);
+
+        // 공항 -> 제주대 직접 연결 라인 (붉은색 점선)
+        const directPath = L.polyline([locations.airport.coords, locations.university.coords], {
+            color: '#d32f2f',
+            weight: 3,
+            opacity: 0.6,
+            dashArray: '2, 5'
+        }).addTo(map);
+
+        // 8. 선을 클릭했을 때도 거리가 팝업으로 뜨도록 설정
+        polyline.bindPopup(`총 이동 경로 (공항-중앙여고-제주대)`);
+    </script>
+</body>
+</html>
